@@ -1,0 +1,35 @@
+/.bundle/
+/.yardoc
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+
+# rspec failure tracking
+.rspec_status
+
+# Gem files
+*.gem
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# VCR cassettes (may contain sensitive data)
+spec/fixtures/vcr_cassettes/*.yml
+
+# Bundler
+Gemfile.lock
