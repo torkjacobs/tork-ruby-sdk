@@ -2,5 +2,5 @@
 
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in tork_governance.gemspec
-gemspec
+# Specify your gem's dependencies in tork-governance.gemspec
+gemspec name: 'tork-governance'
