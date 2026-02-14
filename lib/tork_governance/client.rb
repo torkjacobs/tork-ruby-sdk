@@ -3,13 +3,15 @@
 module TorkGovernance
   # Governance result
   class GovernResult
-    attr_reader :action, :output, :pii, :receipt
+    attr_reader :action, :output, :pii, :receipt, :region, :industry
 
-    def initialize(action:, output:, pii:, receipt:)
+    def initialize(action:, output:, pii:, receipt:, region: nil, industry: nil)
       @action = action
       @output = output
       @pii = pii
       @receipt = receipt
+      @region = region
+      @industry = industry
     end
 
     def allowed?
@@ -57,6 +59,8 @@ module TorkGovernance
     # Apply governance to content
     #
     # @param input [String] the content to govern
+    # @param region [Array<String>, nil] optional regional PII profiles (e.g. ["ae", "in"])
+    # @param industry [String, nil] optional industry profile (e.g. "healthcare", "finance", "legal")
     # @return [GovernResult] the governance result
     #
     # @example
@@ -64,7 +68,7 @@ module TorkGovernance
     #   result = client.govern("My email is test@example.com")
     #   puts result.output # "My email is [EMAIL_REDACTED]"
     #   puts result.receipt.id # "rcpt_..."
-    def govern(input)
+    def govern(input, region: nil, industry: nil)
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC, :nanosecond)
 
       # Detect PII
@@ -102,7 +106,9 @@ module TorkGovernance
         action: action,
         output: output,
         pii: pii,
-        receipt: receipt
+        receipt: receipt,
+        region: region,
+        industry: industry
       )
     end
 
