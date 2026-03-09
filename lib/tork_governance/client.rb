@@ -3,15 +3,16 @@
 module TorkGovernance
   # Governance result
   class GovernResult
-    attr_reader :action, :output, :pii, :receipt, :region, :industry
+    attr_reader :action, :output, :pii, :receipt, :region, :industry, :session_context
 
-    def initialize(action:, output:, pii:, receipt:, region: nil, industry: nil)
+    def initialize(action:, output:, pii:, receipt:, region: nil, industry: nil, session_context: nil)
       @action = action
       @output = output
       @pii = pii
       @receipt = receipt
       @region = region
       @industry = industry
+      @session_context = session_context
     end
 
     def allowed?
@@ -61,6 +62,10 @@ module TorkGovernance
     # @param input [String] the content to govern
     # @param region [Array<String>, nil] optional regional PII profiles (e.g. ["ae", "in"])
     # @param industry [String, nil] optional industry profile (e.g. "healthcare", "finance", "legal")
+    # @param agent_id [String, nil] identifier for the agent making the call
+    # @param agent_role [String, nil] role of the agent: "planner", "worker", or "judge"
+    # @param session_id [String, nil] groups all calls from the same agent session
+    # @param session_turn [Integer, nil] position in the conversation (1, 2, 3...)
     # @return [GovernResult] the governance result
     #
     # @example
@@ -68,7 +73,7 @@ module TorkGovernance
     #   result = client.govern("My email is test@example.com")
     #   puts result.output # "My email is [EMAIL_REDACTED]"
     #   puts result.receipt.id # "rcpt_..."
-    def govern(input, region: nil, industry: nil)
+    def govern(input, region: nil, industry: nil, agent_id: nil, agent_role: nil, session_id: nil, session_turn: nil)
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC, :nanosecond)
 
       # Detect PII
@@ -102,13 +107,25 @@ module TorkGovernance
       @stats[:total_processing_ns] += processing_time_ns
       @stats[:action_counts][action] += 1
 
+      # Build session context if any agent/session fields are provided
+      session_context = nil
+      if agent_id || agent_role || session_id || session_turn
+        session_context = {
+          agent_id: agent_id,
+          agent_role: agent_role,
+          session_id: session_id,
+          session_turn: session_turn
+        }.compact
+      end
+
       GovernResult.new(
         action: action,
         output: output,
         pii: pii,
         receipt: receipt,
         region: region,
-        industry: industry
+        industry: industry,
+        session_context: session_context
       )
     end
 
