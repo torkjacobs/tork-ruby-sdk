@@ -12,6 +12,9 @@ module TorkGovernance
     ADDRESS = "address"
     IP_ADDRESS = "ip_address"
     DATE_OF_BIRTH = "date_of_birth"
+    PASSPORT = "passport"
+    DRIVERS_LICENSE = "drivers_license"
+    BANK_ACCOUNT = "bank_account"
   end
 
   # PII detection patterns
@@ -43,6 +46,18 @@ module TorkGovernance
     PIIType::DATE_OF_BIRTH => {
       pattern: /\b(?:0[1-9]|1[0-2])\/(?:0[1-9]|[12]\d|3[01])\/(?:19|20)\d{2}\b/,
       redaction: "[DOB_REDACTED]"
+    },
+    PIIType::PASSPORT => {
+      pattern: /\b[A-Z]{1,2}\d{6,9}\b/,
+      redaction: "[PASSPORT_REDACTED]"
+    },
+    PIIType::DRIVERS_LICENSE => {
+      pattern: /\b[A-Z]\d{7,14}\b/,
+      redaction: "[DL_REDACTED]"
+    },
+    PIIType::BANK_ACCOUNT => {
+      pattern: /\b\d{8,17}\b/,
+      redaction: "[ACCOUNT_REDACTED]"
     }
   }.freeze
 

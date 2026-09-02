@@ -58,6 +58,42 @@ result = tork.govern(
 # Available industries: healthcare, finance, legal
 ```
 
+## Scanning tool results
+
+A tool result returned by an MCP server — or any external system you do not control — is untrusted input that is about to be appended to a model's context. `TorkGovernance::ToolResultScan.scan_tool_result` scans it first, on-device, for PII and prompt injection:
+
+```ruby
+require 'tork_governance'
+
+tork = TorkGovernance::Client.new
+scan = tork.scan_tool_result(
+  tool_name: 'lookup_customer',
+  server_uri: 'mcp://crm.internal/customers',
+  payload: tool_result,          # whatever the server returned
+  block_on_injection: true
+)
+
+if scan.blocked
+  warn(scan.reason)               # do not append anything
+else
+  append_to_context(scan.sanitized) # PII masked in place
+end
+
+scan.findings
+# [#<struct TorkGovernance::ToolResultScan::ToolResultFinding kind="pii", type="email", count=1, location="$.content[0].text">,
+#  #<struct ... kind="injection", type="heuristic:instruction_override", count=1, location="$.content[0].text">]
+```
+
+There is also a standalone `TorkGovernance::ToolResultScan.scan_tool_result(tool_name:, payload:, ...)` module method with the same keyword arguments that returns `sanitized`/`findings`/`blocked`/`reason` and produces no receipt.
+
+- **PII uses the same on-device detector as `govern`** — same patterns, same redaction labels. Matches are masked in place; the payload structure is otherwise unchanged, and a clean payload comes back untouched (`equal?` its input).
+- **Injection detection is heuristic.** A conservative pattern set (`tork-injection-heuristics-v1`) covering instruction-override phrases, role reassignment, and exfiltration URLs. Every injection finding is typed `heuristic:<name>` because that is exactly what it is: a regex match over untrusted text, with false positives and false negatives, not a verified determination. Without `block_on_injection`, matches are reported and the result is still returned; with it, `sanitized` is `nil` so no masked copy can be appended by accident.
+- **Zero network calls.** The scan is pure and synchronous. The payload never leaves the machine.
+- **Recorded on the receipt as counts only.** `receipt.tool_result_scan` carries `attested_by: 'client'`, `capture_mode: 'edge'`, the tool name and server URI, counts by kind and type, the blocked flag, and the SDK version. It never carries the payload, a matched value, or a location path.
+- **PII parity tier: TIER 1.** This SDK detects the same 10-type basic vocabulary as the JS SDK (`ssn`, `credit_card`, `email`, `phone`, `address`, `ip_address`, `date_of_birth`, `passport`, `drivers_license`, `bank_account`), with JS-identical type labels. It does **not** implement the Python SDK's regional/industry pattern tier — there is no `region:`/`industry:` support in `scan_tool_result`.
+
+**This is a client-side, client-attested control.** The scan runs in your process, and the receipt says so: Tork did not execute it and cannot verify it ran at all. **Gateway-side enforcement, where a caller cannot skip the scan, is a separate and later control.** Do not read a `tool_result_scan` block as proof that every tool result reaching a model was scanned; read it as a record of the scans a caller chose to run.
+
 ## Supported Frameworks (2 Adapters)
 
 ### Web Frameworks
@@ -140,14 +176,22 @@ TorkGovernance.configure(
 
 ## PII Detection
 
-Detects 50+ PII types including:
+Detects the 10-type Tier 1 basic vocabulary, with labels identical to the JS SDK's Tier 1 tier:
 
-| Category | Types |
-|----------|-------|
-| **US** | SSN, EIN, ITIN, Passport, Driver's License |
-| **Australia** | TFN, ABN, ACN, Medicare |
-| **Financial** | Credit Card, Bank Account, SWIFT/BIC |
-| **Universal** | Email, IP Address, URL, Phone, DOB |
+| Type | Label |
+|------|-------|
+| SSN | `ssn` |
+| Credit Card | `credit_card` |
+| Email | `email` |
+| Phone | `phone` |
+| Address | `address` |
+| IP Address | `ip_address` |
+| Date of Birth | `date_of_birth` |
+| Passport | `passport` |
+| Driver's License | `drivers_license` |
+| Bank Account | `bank_account` |
+
+This SDK does not implement region-specific (e.g. AU TFN/ABN/ACN/Medicare, US EIN/ITIN, SWIFT/BIC) or industry-specific patterns — that is the Python SDK's regional tier, not this one.
 
 ## Documentation
 

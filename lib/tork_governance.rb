@@ -2,6 +2,7 @@
 
 require_relative "tork_governance/version"
 require_relative "tork_governance/pii"
+require_relative "tork_governance/tool_result_scan"
 require_relative "tork_governance/receipt"
 require_relative "tork_governance/client"
 
@@ -28,6 +29,18 @@ module TorkGovernance
     #   puts result.output # "My SSN is [SSN_REDACTED]"
     def govern(content)
       client.govern(content)
+    end
+
+    # Scan a tool result (MCP server response, or any external system's
+    # output) for PII and prompt injection before it is appended to model
+    # context, recorded on a receipt.
+    #
+    # @param tool_name [String] name of the tool that produced this result
+    # @param payload [Object] the tool result itself (any JSON-shaped value)
+    # @param server_uri [String, nil] URI of the MCP server, recorded when present
+    # @return [TorkGovernance::GovernedToolResultScanResult]
+    def scan_tool_result(tool_name:, payload:, server_uri: nil, **opts)
+      client.scan_tool_result(tool_name: tool_name, payload: payload, server_uri: server_uri, **opts)
     end
 
     # Get or create the default client
