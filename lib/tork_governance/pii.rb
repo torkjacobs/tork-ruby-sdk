@@ -2,6 +2,8 @@
 
 require 'set'
 
+require_relative 'pii/country'
+
 module TorkGovernance
   # PII types
   module PIIType
@@ -75,14 +77,23 @@ module TorkGovernance
 
   # PII detection result
   class PIIResult
-    attr_reader :has_pii, :types, :count, :matches, :redacted_text
+    attr_reader :has_pii, :types, :count, :matches, :redacted_text,
+                :country_matches, :country_labels, :regions
 
-    def initialize(has_pii:, types:, count:, matches:, redacted_text:)
+    def initialize(has_pii:, types:, count:, matches:, redacted_text:,
+                   country_matches: [], country_labels: [], regions: [])
       @has_pii = has_pii
       @types = types
       @count = count
       @matches = matches
       @redacted_text = redacted_text
+      # Country-registry detections, kept separate from +matches+ so the ten
+      # L0 type symbols stay the closed set they have always been.
+      @country_matches = country_matches
+      # Redaction labels of those matches, e.g. "NATIONAL_ID".
+      @country_labels = country_labels
+      # Country profiles the text activated, in registry order.
+      @regions = regions
     end
 
     alias has_pii? has_pii
@@ -90,35 +101,112 @@ module TorkGovernance
 
   # PII detector
   class PIIDetector
-    def self.detect(text)
-      matches = []
-      types = Set.new
-      redacted_text = text.dup
-
+    # Detect PII in +text+.
+    #
+    # +regions+ forces a set of country profiles on, case-insensitively; nil or
+    # [] infers them from the content.
+    #
+    # REDACTION IS ONE PASS. Until 0.3.0 each type was redacted with its own
+    # +gsub+ over text a previous type had already rewritten, while +matches+
+    # carried indices into the ORIGINAL text. Two types matching overlapping
+    # spans could leave half an identifier standing beside a redaction token --
+    # digits exposed in output the caller had been told was redacted. Every
+    # match is now collected against the original text, overlaps are resolved
+    # before anything is rewritten, and the surviving spans are spliced right to
+    # left in a single pass.
+    def self.detect(text, regions = nil)
+      l0 = []
       PII_PATTERNS.each do |pii_type, config|
         pattern = config[:pattern]
         redaction = config[:redaction]
+        pos = 0
+        while (m = pattern.match(text, pos))
+          start_index = m.begin(0)
+          end_index = m.end(0)
+          pos = end_index > start_index ? end_index : start_index + 1
+          next if end_index == start_index
 
-        text.scan(pattern) do |match|
-          match_data = Regexp.last_match
-          matches << PIIMatch.new(
-            type: pii_type,
-            value: match_data[0],
-            start_index: match_data.begin(0),
-            end_index: match_data.end(0)
-          )
-          types << pii_type
+          l0 << {
+            match: PIIMatch.new(
+              type: pii_type,
+              value: m[0],
+              start_index: start_index,
+              end_index: end_index
+            ),
+            redaction: redaction
+          }
         end
-
-        redacted_text = redacted_text.gsub(pattern, redaction)
       end
 
+      active_regions =
+        if regions.is_a?(Array) && !regions.empty?
+          regions.map(&:upcase)
+        else
+          Tork::Governance::Pii::Country.infer_regions(text)
+        end
+
+      country_matches = Tork::Governance::Pii::Country.detect(
+        text, Tork::Governance::Pii::Country.patterns_for_regions(active_regions)
+      )
+
+      # Resolve overlaps before anything is rewritten. A country identifier
+      # supersedes any L0 span it fully contains -- the cloud does the same,
+      # which is how a Saudi national ID stops coming back as [PHONE_REDACTED].
+      claimed = country_matches.map { |c| [c.start_index, c.end_index] }
+      spans = country_matches.map do |c|
+        Tork::Governance::Pii::Country::RedactionSpan.new(
+          start_index: c.start_index, end_index: c.end_index, redaction: c.redaction
+        )
+      end
+
+      matches = []
+      types = Set.new
+
+      l0.each do |hit|
+        m = hit[:match]
+        start_index = m.start_index
+        end_index = m.end_index
+        overlapping = claimed.select { |(rs, re)| start_index < re && end_index > rs }
+
+        unless overlapping.empty?
+          swallows_all = overlapping.all? do |(rs, re)|
+            cs, ce = Tork::Governance::Pii::Country.trimmed_core(text, rs, re)
+            start_index <= cs && end_index >= ce
+          end
+          next unless swallows_all
+
+          # An L0 span that fully contains a country span still loses: the
+          # country label is the more specific claim.
+          hits_country = overlapping.any? do |(rs, re)|
+            country_matches.any? { |c| c.start_index == rs && c.end_index == re }
+          end
+          next if hits_country
+
+          overlapping.each do |o|
+            claimed.delete(o)
+            spans.reject! { |sp| sp.start_index == o[0] && sp.end_index == o[1] }
+          end
+        end
+
+        claimed << [start_index, end_index]
+        spans << Tork::Governance::Pii::Country::RedactionSpan.new(
+          start_index: start_index, end_index: end_index, redaction: hit[:redaction]
+        )
+        matches << m
+        types << m.type
+      end
+
+      matches.sort_by!(&:start_index)
+
       PIIResult.new(
-        has_pii: matches.any?,
+        has_pii: matches.any? || country_matches.any?,
         types: types.to_a,
-        count: matches.size,
+        count: matches.size + country_matches.size,
         matches: matches,
-        redacted_text: redacted_text
+        redacted_text: Tork::Governance::Pii::Country.apply_redactions(text, spans),
+        country_matches: country_matches,
+        country_labels: country_matches.map(&:label).uniq,
+        regions: active_regions
       )
     end
   end

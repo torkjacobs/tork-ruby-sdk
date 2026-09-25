@@ -1,10 +1,14 @@
 # frozen_string_literal: true
 
-require_relative "lib/tork/version"
+# The gem is tork-governance, so its version comes from
+# lib/tork_governance/version.rb. Until 0.4.0 this read lib/tork/version.rb --
+# the constant belonging to the separate `Tork` API client that also lives in
+# this repository. The two happened to agree; nothing kept them in step.
+require_relative "lib/tork_governance/version"
 
 Gem::Specification.new do |spec|
   spec.name = "tork-governance"
-  spec.version = Tork::VERSION
+  spec.version = TorkGovernance::VERSION
   spec.authors = ["Tork Network"]
   spec.email = ["support@tork.network"]
 
