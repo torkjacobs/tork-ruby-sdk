@@ -214,7 +214,20 @@ Detects the 10-type Tier 1 basic vocabulary, with labels identical to the JS SDK
 | Driver's License | `drivers_license` |
 | Bank Account | `bank_account` |
 
+`passport`, `drivers_license` and `bank_account` are shape-only heuristics (no checksum) and can over-match.
+
 This SDK does not implement region-specific (e.g. AU TFN/ABN/ACN/Medicare, US EIN/ITIN, SWIFT/BIC) or industry-specific patterns — that is the Python SDK's regional tier, not this one.
+
+## Agent telemetry fields
+
+`govern` and `Tork::Client#evaluate` accept optional `agent_id`, `agent_role` (`"planner"`, `"worker"`, `"judge"`), `session_id` and `session_turn` (Integer). They are sent/returned only when set.
+
+```ruby
+result = client.govern("hi", agent_id: "agent-7", agent_role: "worker", session_id: "s-1", session_turn: 3)
+result.session_context # => { agent_id: "agent-7", agent_role: "worker", session_id: "s-1", session_turn: 3 }
+
+Tork::Client.new(api_key: "...").evaluate(prompt: "hi", agent_id: "agent-7", session_turn: 3)
+```
 
 ## Documentation
 

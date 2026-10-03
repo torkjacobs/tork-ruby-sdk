@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0 - 2026-10-03
+
+### Added
+- **Agent telemetry fields** `agent_id`, `agent_role`, `session_id` and
+  `session_turn` (Integer) on `Tork::Client#evaluate` /
+  `Tork::Resources::Evaluation#create` (sent in the request body only when set)
+  and on `TorkGovernance::Client#govern`. `GovernResult#to_h` now includes
+  `session_context` when any field is set, and omits it otherwise. A
+  non-Integer `session_turn` raises `ArgumentError`.
+- `spec/pii_detection_per_type_spec.rb`: a positive and a negative example for
+  every declared PII type, and a check that the examples cover every declared type.
+
+### PII types (SDK-DECLARED-PII-TYPES-WITHOUT-PATTERNS-ACROSS-SDKS)
+- Audited: all 10 declared types (`ssn`, `credit_card`, `email`, `phone`,
+  `address`, `ip_address`, `date_of_birth`, `passport`, `drivers_license`,
+  `bank_account`) have a pattern. No type was removed. `passport`,
+  `drivers_license` and `bank_account` are shape-only heuristics (no checksum)
+  and can over-match; they are kept to stay byte-identical with the JS Tier 1
+  vocabulary used in receipts.
+
 ## 0.4.0 - 2026-09-25
 
 ### Added

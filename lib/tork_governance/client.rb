@@ -37,7 +37,7 @@ module TorkGovernance
           count: pii.count
         },
         receipt: receipt.to_h
-      }
+      }.tap { |h| h[:session_context] = session_context if session_context }
     end
   end
 
@@ -92,6 +92,10 @@ module TorkGovernance
     #   puts result.output # "My email is [EMAIL_REDACTED]"
     #   puts result.receipt.id # "rcpt_..."
     def govern(input, region: nil, industry: nil, agent_id: nil, agent_role: nil, session_id: nil, session_turn: nil)
+      unless session_turn.nil? || session_turn.is_a?(Integer)
+        raise ArgumentError, "session_turn must be an Integer"
+      end
+
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC, :nanosecond)
 
       # Detect PII
@@ -127,7 +131,7 @@ module TorkGovernance
 
       # Build session context if any agent/session fields are provided
       session_context = nil
-      if agent_id || agent_role || session_id || session_turn
+      unless [agent_id, agent_role, session_id, session_turn].all?(&:nil?)
         session_context = {
           agent_id: agent_id,
           agent_role: agent_role,

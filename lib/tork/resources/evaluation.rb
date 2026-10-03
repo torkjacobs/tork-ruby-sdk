@@ -14,10 +14,23 @@ module Tork
       # @param response [String, nil] The response/output to evaluate
       # @param policy_id [String, nil] Specific policy ID (uses default if nil)
       # @param checks [Array<String>] Checks to perform (pii, toxicity, moderation)
+      # @param agent_id [String, nil] identifier for the agent making the call
+      # @param agent_role [String, nil] role of the agent: "planner", "worker", or "judge"
+      # @param session_id [String, nil] groups all calls from the same agent session
+      # @param session_turn [Integer, nil] position in the conversation (1, 2, 3...)
       # @param options [Hash] Additional options
       # @return [Hash] Evaluation result
-      def create(prompt:, response: nil, policy_id: nil, checks: nil, **options)
+      def create(prompt:, response: nil, policy_id: nil, checks: nil,
+                 agent_id: nil, agent_role: nil, session_id: nil, session_turn: nil, **options)
+        unless session_turn.nil? || session_turn.is_a?(Integer)
+          raise ArgumentError, "session_turn must be an Integer"
+        end
+
         body = { content: prompt }
+        body[:agent_id] = agent_id unless agent_id.nil?
+        body[:agent_role] = agent_role unless agent_role.nil?
+        body[:session_id] = session_id unless session_id.nil?
+        body[:session_turn] = session_turn unless session_turn.nil?
         body[:response] = response if response
         body[:policy_id] = policy_id if policy_id
         body[:checks] = checks if checks
