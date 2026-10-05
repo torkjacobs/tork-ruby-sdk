@@ -44,13 +44,22 @@ module Tork
     # @param prompt [String] The prompt to evaluate
     # @param response [String, nil] The response to evaluate
     # @param policy_id [String, nil] Policy ID to use
+    # @param agent_id [String, nil] identifier for the agent making the call
+    # @param agent_role [String, nil] role of the agent: "planner", "worker", or "judge"
+    # @param session_id [String, nil] groups all calls from the same agent session
+    # @param session_turn [Integer, nil] position in the conversation (1, 2, 3...)
     # @param options [Hash] Additional options
     # @return [Hash] Evaluation result
-    def evaluate(prompt:, response: nil, policy_id: nil, **options)
+    def evaluate(prompt:, response: nil, policy_id: nil,
+                 agent_id: nil, agent_role: nil, session_id: nil, session_turn: nil, **options)
       evaluations.create(
         prompt: prompt,
         response: response,
         policy_id: policy_id,
+        agent_id: agent_id,
+        agent_role: agent_role,
+        session_id: session_id,
+        session_turn: session_turn,
         **options
       )
     end
